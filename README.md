@@ -1,59 +1,47 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
-
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Lab DevOps - BovWeight API
+IF7100 | I Ciclo 2026
+ 
+## Ejercicio 1 - Pipeline CI
+ 
+### ci.yml
+El pipeline corre en cada push a `main` y `develop`, y en cada PR hacia esas ramas. Levanta un servicio MySQL 8.0, instala dependencias con Composer, corre migraciones y ejecuta los tests con PHPUnit.
+ 
+### Preguntas
+ 
+**1. ¿Cuánto tardó el pipeline y cuál fue el step más lento?**  
+El pipeline tardó 44 segundos. El step más lento fue `Install dependencies` (composer install) porque descarga todos los paquetes desde cero en cada ejecución.
+ 
+**2. ¿Qué pasa en el PR si una prueba falla?**  
+El CI corre automáticamente y si falla, GitHub bloquea el merge. El botón "Merge pull request" queda deshabilitado hasta que el check `laravel-test` pase en verde.
+ 
+![PR bloqueado](capturas/pr_bloqueado.png)
+![Log del error](capturas/log_error.png)
+ 
+**3. ¿Por qué MySQL y no SQLite?**  
+BovWeight usa funciones específicas de MySQL (ENUMs, JSON columns, foreign keys estrictas) que SQLite no soporta igual. Además el proyecto usa MySQL en producción, entonces las pruebas deben correr en el mismo motor para que sean válidas.
+ 
+**4. ¿Qué ventaja tiene `actions/checkout@v4` frente a clonar manualmente?**  
+Maneja la autenticación automáticamente, hace un shallow clone optimizado, y está mantenida oficialmente por GitHub. Un `git clone` manual requeriría configurar credenciales y sería más lento.
+ 
+---
+ 
+## Ejercicio 2 - Estrategia de Ramas y Branch Protection
+ 
+| Rama | Propósito | Protección |
+|------|-----------|------------|
+| `main` | Producción | PR obligatorio + CI verde + no force push |
+| `develop` | Integración | CI en cada push |
+| `feature/*` | Funcionalidades nuevas | CI en cada push, merge a develop |
+| `hotfix/*` | Correcciones urgentes | Merge directo a main y develop |
+ 
+### Branch Protection configurada en `main`
+- Require a pull request before merging
+- Require status checks to pass → `laravel-test`
+- Require branches to be up to date before merging
+- Block force pushes
+![Ramas](capturas/branches.png)
+![Ruleset activo](capturas/ruleset.png)
+![Status checks](capturas/status_checks.png)
+ 
+### Verificación
+Se creó la rama `feature/test-protection` con un test roto a propósito (`assertStatus(500)`). Al abrir el PR, el CI falló y GitHub bloqueó el merge automáticamente, confirmando que la protección funciona.
